@@ -14,18 +14,6 @@
 HLW8032 HL;
 
 //********************************************************************************************
-// Defining Parameters
-//********************************************************************************************
-
-#define U_Voltage 280.0
-#define L_Voltage 180.0
-#define U_Current 13.0
-#define L_Current 0.1
-#define U_Temp 55
-#define L_Temp 10
-#define AVERAGE_SAMPLES 15
-
-//********************************************************************************************
 // Variables
 //********************************************************************************************
 
@@ -35,18 +23,16 @@ float Current = 0.0;
 float Voltage = 230.0;
 float Power = 0.0;
 float Temp = 30.0;
-float Voltage_Average = 0;
 float Current_Average = 0;
 float KWh = 0.0;
 float KWh_Value = 0.0;
-unsigned long SYNC_TIME = 1000;
 unsigned long start_time;
 unsigned long end_time;
 unsigned long Session_Counter;
 bool Overload_Flag = false;
 bool Battery_Full_Flag = false;
 bool Session_Time_Out = false;
-uint8_t i = 1;
+uint32_t i = 1;
 
 //********************************************************************************************
 // Initilise Meter
@@ -119,10 +105,9 @@ void Set_KWh_Value(float _Kwh_Value)
 
 void Running_Current_Average(void)
 {
-    if (i % AVERAGE_SAMPLES == 0)
+    if (i % Total_Number_Of_Samples == 0)
     {
-        Voltage_Average = Voltage_Average / AVERAGE_SAMPLES;
-        Current_Average = Current_Average / AVERAGE_SAMPLES;
+        Current_Average = Current_Average / Total_Number_Of_Samples;
         if (Current_Average < L_Current)
         {
             Battery_Full_Flag = true;
@@ -138,7 +123,6 @@ void Running_Current_Average(void)
     else
     {
         i++;
-        Voltage_Average += Voltage;
         Current_Average += Current;
     }
 }
@@ -149,7 +133,7 @@ void Running_Current_Average(void)
 
 void Over_VI_Monitoring()
 {
-    if (Voltage > U_Voltage || Voltage < L_Voltage || Current > U_Current || Temp > U_Temp)
+    if (Voltage > U_Voltage || Voltage < L_Voltage || Current > U_Current || Temp > U_Temp || Temp < L_Temp)
     {
         Overload_Flag = true;
         Serial.println("System Stopped due to over load condition!");
@@ -175,25 +159,25 @@ void Temp_Measure(void)
 }
 
 //********************************************************************************************
-// Meter Values Read at 1 sec.
+// Meter Values Read at Sampling Rate
 //********************************************************************************************
 
 void Read_Meter_Values(void)
 {
     end_time = millis();
     HL.SerialReadLoop();
-    if (end_time - start_time > SYNC_TIME)
+    if (end_time - start_time >= Metering_Time_Interval_mSec)
     {
         if (HL.SerialRead == 1)
         {
             Voltage = (HL.GetVol() / 1000.0);
             Current = (HL.GetCurrent());
             Power = (HL.GetInspectingPower() * 1e-6);
-            KWh = KWh + (Power / 3600.0);
+            KWh = KWh + (Power / (Time_Multiplier * Time_Multiplier * Number_Of_Samples_Per_Sec));
             Temp_Measure();
         }
-        Serial.printf("V: %0.2fV\tI: %0.4fA\tP: %0.4fKW\tE: %0.8fKWh\tT: %0.2f°C\n", Voltage, Current, Power, KWh, Temp);
-        //Convert_Values_In_String();
+        Serial.printf("V: %0.2fV\tI: %0.4fA\tP: %0.4fKW\tE: %0.8fKWh\tT: %0.2f°C\n\r",
+                      Voltage, Current, Power, KWh, Temp);
         Running_Current_Average();
         Session_KWh_Monitorig();
         Over_VI_Monitoring();

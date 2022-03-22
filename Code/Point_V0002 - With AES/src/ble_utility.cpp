@@ -29,13 +29,10 @@ std::string rxValue;
 //********************************************************************************************
 // BLE Uitility
 //********************************************************************************************
-// uint8_t dev_to_app_frame[20];							//Device to App Communication
-
-char app_to_dev_frame[1024]; // App to Device Communication
-
-// uint8_t ble_grid_status[3] = {0x02, 0x09, 0x00}; // Update Device Status Code in ble_grid_status[2] only, Keep rest bytes as it is.
-
+// uint8_t dev_to_app_frame[20]; //Device to App Communication
+char app_to_dev_frame[1024];	 // App to Device Communication
 String blue_name = Charger_Name; // Change last character of array as per avalability
+// uint8_t ble_grid_status[3] = {0x02, 0x09, 0x00}; // Update Device Status Code in ble_grid_status[2] only, Keep rest bytes as it is.
 
 //********************************************************************************************
 // Class to Class Poly
@@ -127,7 +124,7 @@ void data_communication(void)
 {
 	if (!deviceConnected && oldDeviceConnected)
 	{
-		delay(500);								// Warm-up period
+		delay(500);										// Warm-up period
 		esp_ble_gap_set_device_name(blue_name.c_str()); // Bluetooth Name Change
 		delay(500);
 
@@ -155,9 +152,9 @@ bool device_connect_status()
 	return deviceConnected;
 }
 
-char *Scan_JSON_On_BLE(void)
-{	
-	return (char *)rxValue.c_str();
+String Scan_JSON_On_BLE(void)
+{
+	return String(rxValue.c_str());
 }
 //********************************************************************************************
 // End of File

@@ -52,6 +52,6 @@ class HLW8032
 		uint32_t PFData = 1;         
 		uint32_t VolR1 = 1880000;    //Voltage divider Upstream resistors 470K*4  1880K
 		uint32_t VolR2 = 1000;       //Voltage divider downstream resistors  1K
-		float CurrentRF = 0.9925*1E-3;     
+		float CurrentRF = 0.935*1E-3;     
 };
 #endif

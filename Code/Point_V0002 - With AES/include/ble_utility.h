@@ -15,7 +15,7 @@ void ble_init(void);
 void data_communication(void);
 void send_data_app(uint8_t *dev_to_app_frame, uint16_t length);
 bool device_connect_status();
-char *Scan_JSON_On_BLE(void);
+String Scan_JSON_On_BLE(void);
 
 //********************************************************************************************
 // End of File

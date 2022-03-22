@@ -5,8 +5,10 @@
 #include "Arduino.h"
 #include <Define.h>
 #include "ArduinoJson.h"
+#include <MJSON.h>
 #include "ble_utility.h"
 #include "Metering.h"
+#include "M_EEPROM.h"
 #include "AESLib.h"
 
 //********************************************************************************************
@@ -14,8 +16,8 @@
 //********************************************************************************************
 
 AESLib aesLib;
-DynamicJsonDocument doc(384);
-DynamicJsonDocument doc1(384);
+StaticJsonDocument<512> doc;
+StaticJsonDocument<512> doc1;
 
 //********************************************************************************************
 // Internal Calling Functions Declaration
@@ -26,12 +28,13 @@ void Read_JSON_Frame(void);
 void deser_JSON(char _json[]);
 void ser_JSON(void);
 String encrypt(char *msg, uint16_t msgLen, byte iv[]);
+String decrypt(char *msg, uint16_t msgLen, byte iv[]);
 
 //********************************************************************************************
 // Local Variables
 //********************************************************************************************
 
-const char *APP_ID;
+String USER_ID;
 uint8_t Start_Command = 0;
 bool Set_KWh_Value_Flag = false;
 bool Start_Charge = false;
@@ -39,6 +42,7 @@ float KWh_from_App = 0.0;
 
 String Rx_JSON_Packet;
 String Tx_JSON_Packet;
+String Crypto;
 
 char cleartext[256];
 char ciphertext[512];
@@ -54,7 +58,7 @@ byte aes_iv[N_BLOCK] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x
 void RX_Json_Packet_Field_Identifier(void)
 {
     Read_JSON_Frame();
-    APP_ID = doc["app_id"];
+    USER_ID = (const char *)doc["user_id"];
     KWh_from_App = doc["KWh"];
     Start_Command = doc["start"];
     Set_flags_As_Per_Identifier();
@@ -100,7 +104,8 @@ void deser_JSON(char _json[])
 
 void ser_JSON(void)
 {
-    doc1["app_id"] = "A0001";
+    doc1["type"] = "Pointz";
+    doc1["user_id"] = USER_ID;
     doc1["charger_id"] = Charger_Name;
     if (!device_connect_status())
         doc1["ble_status"] = "OFF";
@@ -116,11 +121,16 @@ void ser_JSON(void)
     doc1["meter_data"][2] = Power;
     doc1["meter_data"][3] = KWh;
     doc1["meter_data"][4] = Temp;
+    doc1["prev_user_id"] = Read_EEPROM_String(EEPROM_START_ADD);
+    doc1["prev_KWh"] = Read_EEPROM_Float(EEPROM_START_ADD + USER_ID.length());
     if (!Over_Load_Status())
         doc1["overload"] = "OFF";
     else
         doc1["overload"] = "ON";
     serializeJson(doc1, Tx_JSON_Packet);
+    Crypto = encrypt(strdup(Tx_JSON_Packet.c_str()), Tx_JSON_Packet.length(), aes_iv);
+    // Serial.println(Crypto);
+    // Serial.println(decrypt(strdup(Crypto.c_str()),Crypto.length(), aes_iv));
 }
 
 //********************************************************************************************
@@ -131,7 +141,6 @@ void Send_JSON_Frame(void)
 {
     ser_JSON();
     send_data_app((uint8_t *)Tx_JSON_Packet.c_str(), (uint16_t)Tx_JSON_Packet.length());
-    Serial.println(encrypt(strdup(Tx_JSON_Packet.c_str()), Tx_JSON_Packet.length(), aes_iv));
     Tx_JSON_Packet.clear();
 }
 
@@ -153,14 +162,29 @@ String encrypt(char *msg, uint16_t msgLen, byte iv[])
     int cipherlength = aesLib.get_cipher64_length(msgLen);
     char encrypted[cipherlength]; // AHA! needs to be large, 2x is not enough
     aesLib.encrypt64(msg, msgLen, encrypted, aes_key, sizeof(aes_key), iv);
-    Serial.print("encrypted = ");
-    Serial.println(encrypted);
+    // Serial.print("encrypted = ");
+    // Serial.println(encrypted);
     return String(encrypted);
 }
 
+//********************************************************************************************
+// AES Decryption
+//********************************************************************************************
+
+String decrypt(char *msg, uint16_t msgLen, byte iv[])
+{
+    char decrypted[msgLen];
+    aesLib.decrypt64(msg, msgLen, decrypted, aes_key, sizeof(aes_key), iv);
+    return String(decrypted);
+}
+
+//********************************************************************************************
+// AES Encryption Initilisation
+//********************************************************************************************
+
 void AES_Init(void)
 {
-    aesLib.set_paddingmode(paddingMode::CMS);
+    aesLib.set_paddingmode(paddingMode::Null);
     //
     // verify with https://cryptii.com
     // previously: verify with https://gchq.github.io/CyberChef/#recipe=To_Base64('A-Za-z0-9%2B/%3D')
@@ -172,4 +196,15 @@ void AES_Init(void)
     base64_encode(b64enc, (char *)"0123456789", 10);
     char b64dec[base64_dec_len(b64enc, sizeof(b64enc))];
     base64_decode(b64dec, b64enc, sizeof(b64enc));
+}
+
+//********************************************************************************************
+// Record Session in EEPROM
+//********************************************************************************************
+
+void Record_EEPROM(void)
+{
+    Write_EEPROM_String(EEPROM_START_ADD, USER_ID);
+    Write_EEPROM_Float(EEPROM_START_ADD + USER_ID.length(), KWh);
+    Serial.println(Read_EEPROM_Float(EEPROM_START_ADD + USER_ID.length()));
 }

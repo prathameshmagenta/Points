@@ -13,6 +13,7 @@
 void Send_Over_Strip(uint8_t _Red, uint8_t _Green, uint8_t _Blue);
 void Show_LED(uint8_t _Red, uint8_t _Green, uint8_t _Blue);
 void Show_Blink(uint8_t _Red, uint8_t _Green, uint8_t _Blue);
+void Show_Flow(uint8_t _Red, uint8_t _Green, uint8_t _Blue);
 
 //********************************************************************************************
 // Pins Declaration
@@ -44,7 +45,7 @@ void State_of_charger_to_LED(uint8_t _State)
     switch (_State)
     {
     case 0:
-        Show_LED(255, 0, 0);
+        Show_Blink(255, 0, 0);
         break;
     case 1:
         Show_Blink(0, 0, 255);
@@ -53,7 +54,7 @@ void State_of_charger_to_LED(uint8_t _State)
         Show_LED(0, 0, 255);
         break;
     case 3:
-        Show_Blink(0, 255, 0);
+        Show_Flow(0, 255, 0);
         break;
     case 4:
         Show_LED(255, 0, 0);
@@ -70,6 +71,7 @@ void State_of_charger_to_LED(uint8_t _State)
 
 void Show_LED(uint8_t _Red, uint8_t _Green, uint8_t _Blue)
 {
+    Strip.setBrightness(255);
     Send_Over_Strip(_Red, _Green, _Blue);
 }
 
@@ -79,10 +81,22 @@ void Show_LED(uint8_t _Red, uint8_t _Green, uint8_t _Blue)
 
 void Show_Blink(uint8_t _Red, uint8_t _Green, uint8_t _Blue)
 {
+    Strip.setBrightness(255);
     Send_Over_Strip(_Red, _Green, _Blue);
     delay(750);
     Send_Over_Strip(0, 0, 0);
     delay(250);
+}
+
+void Show_Flow(uint8_t _Red, uint8_t _Green, uint8_t _Blue)
+{
+    for (uint8_t i = 0; i < LEDs + (LEDs / 2); i++)
+    {
+        Strip.setPixelColor(i, _Red, _Green, _Blue);
+        Strip.setPixelColor(i - (LEDs / 2), 0);
+        delay(1000 / LEDs);
+        Strip.show();
+    }
 }
 
 //********************************************************************************************
