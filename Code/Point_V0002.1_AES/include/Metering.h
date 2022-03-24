@@ -27,6 +27,7 @@ void Set_KWh_Value(float _Kwh_Value);
 bool Over_Load_Status(void);
 bool Battery_Full_Status(void);
 bool Session_Timeout_Status(void);
+bool Voltage_Monitoring_Status(void);
 
 //********************************************************************************************
 // End of File

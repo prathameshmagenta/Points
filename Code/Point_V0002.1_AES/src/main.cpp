@@ -9,6 +9,7 @@
 #include "MJSON.h"
 #include "M_EEPROM.h"
 #include "Theft.h"
+#include "V_Monitor.h"
 
 //********************************************************************************************
 // Task Handles
@@ -70,24 +71,28 @@ void LED_Thread(void *pvParam)
 
 void Main_Thread(void *pvParam)
 {
-  digitalWrite(RELAY_PIN, LOW);
   while (1)
   {
-    Charger_State = 1;
     digitalWrite(RELAY_PIN, LOW);
+    Charger_State = 0;
+    Serial.println("Checking for Input AC Power Conditions!");
+    while (Voltage_Monitoring_Status() && Theft_Condion())
+      ;
+    Charger_State = 1;
+    Serial.println("Input AC Power Conditions Are Perfect!");
     Serial.println("Waiting for mobile device to connect!");
-    while (!device_connect_status() && !Over_Load_Status() && !Theft_Condion())
+    while (!device_connect_status())
       ;
     Charger_State = 2;
     Serial.println("Mobile device has been paired!");
     vTaskResume(JSON_FRAME_READ_HANDLE);
-    while (!Start_message_identification() && !Over_Load_Status() && !Theft_Condion())
+    while (!Start_message_identification())
       ;
     Charger_State = 3;
     Serial.println("Charging experience started!");
     digitalWrite(RELAY_PIN, HIGH);
     vTaskResume(READ_METER_VALUE_HANDLE);
-    while (Start_message_identification() && !Over_Load_Status() && !Battery_Full_Status() && !Session_Timeout_Status() && !Theft_Condion())
+    while (Start_message_identification() && !Over_Load_Status() && !Battery_Full_Status() && !Session_Timeout_Status())
       ;
     Charger_State = 4;
     Serial.println("Ending charging experience!");
@@ -112,6 +117,7 @@ void All_Init(void)
   disableCore0WDT();
   Serial.begin(115200);
   pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, LOW);
   Meter_Init();
   ble_init();
   LED_Strip_Init();

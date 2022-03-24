@@ -17,8 +17,6 @@ HLW8032 HL;
 // Variables
 //********************************************************************************************
 
-void Convert_Values_In_String(void);
-
 float Current = 0.0;
 float Voltage = 230.0;
 float Power = 0.0;
@@ -150,7 +148,7 @@ void Over_VI_Monitoring()
 
 void Temp_Measure(void)
 {
-    Temp = (analogRead(2) * 3.3 / 4095.0);
+    Temp = (analogRead(TEMP_SENSOR_PIN) * 3.3 / 4095.0);
     Temp = ((3.3 * (10.0 / Temp)) - 10) * 1000.0;
     Temp = log(Temp);
     Temp = (1 / (0.001129148 + (0.000234125 * Temp) +
