@@ -6,6 +6,7 @@
 #include <Define.h>
 #include "HLW8032.h"
 #include "Metering.h"
+#include "MJSON.h"
 
 //********************************************************************************************
 // HLW-8012 Object Creation
@@ -79,7 +80,7 @@ void Session_KWh_Monitorig(void)
     if (KWh / KWh_Value >= 1.0f)
     {
         Session_Time_Out = true;
-        delay(1000);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
         KWh = 0.0;
     }
     else
@@ -184,23 +185,27 @@ void Temp_Measure(void)
 
 void Read_Meter_Values(void)
 {
-    end_time = millis();
     HL.SerialReadLoop();
-    if (end_time - start_time >= Metering_Time_Interval_mSec)
+    end_time = millis();
+    if ((end_time - start_time) >= Metering_Time_Interval_mSec)
     {
         if (HL.SerialRead == 1)
         {
-            Voltage = (HL.GetVol() / 1000.0);
-            Current = (HL.GetCurrent());
-            Power = (HL.GetInspectingPower() * 1e-6);
-            KWh = KWh + (Power / (Time_Multiplier * Time_Multiplier * Number_Of_Samples_Per_Sec));
+            Voltage = HL.GetVol() / 219.75;
+            Current = HL.GetCurrent();
+            Current = (Current < L_Current) ? (0.0) : (Current);
+            Power = (Voltage * Current) / 1000.0;
             Temp_Measure();
         }
-        Serial.printf("V: %0.2fV\tI: %0.4fA\tP: %0.4fKW\tE: %0.8fKWh\tT: %0.2f°C\n\r",
-                      Voltage, Current, Power, KWh, Temp);
-        Running_Current_Average();
-        Session_KWh_Monitorig();
-        Over_VI_Monitoring();
+        if (Start_message_identification() && !Battery_Full_Flag && !Overload_Flag && !Session_Time_Out)
+        {
+            Serial.printf("V: %0.2fV\tI: %0.4fA\tP: %0.4fKW\tE: %0.8fKWh\tT: %0.2f°C\n\r",
+                          Voltage, Current, Power, KWh, Temp);
+            KWh = KWh + (Power / (Time_Multiplier * Time_Multiplier * Number_Of_Samples_Per_Sec));
+            Running_Current_Average();
+            Over_VI_Monitoring();
+            Session_KWh_Monitorig();
+        }
         start_time = end_time;
     }
 }

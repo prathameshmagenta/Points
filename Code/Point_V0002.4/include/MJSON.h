@@ -12,6 +12,5 @@ void RX_Json_Packet_Field_Identifier(void);
 void Send_JSON_Frame(void);
 void ser_JSON(void);
 void AES_Init(void);
-void Record_EEPROM(void);
 
 #endif

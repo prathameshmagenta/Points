@@ -8,6 +8,7 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>
 #include "ble_utility.h"
+#include "BLEAdvertisedDevice.h"
 #include "M_EEPROM.h"
 
 //********************************************************************************************
@@ -70,9 +71,9 @@ class MyCallbacks : public BLECharacteristicCallbacks
 //********************************************************************************************
 void ble_init(void)
 {
-	String blue_name = String("CG_POINT_" + Read_EEPROM_String(EEPROM_CHARGER_ID_ADD));
 	// Create the BLE Device
-	BLEDevice::init(blue_name.c_str());
+	BLEDevice::init(String(Get_Charger_Name() + "_A").c_str());
+	BLEDevice::setPower(ESP_PWR_LVL_P9);
 	// Create the BLE Server
 	pServer = BLEDevice::createServer();
 	pServer->setCallbacks(new MyServerCallbacks());
@@ -114,26 +115,10 @@ void send_data_app(uint8_t *dev_to_app_frame, uint16_t length)
 	}
 }
 
-//********************************************************************************************
-// Continous Work (Keep this function in Loop / While(1) )
-//********************************************************************************************
-// void data_communication(void)
-// {
-// 	if (!deviceConnected && oldDeviceConnected)
-// 	{
-// 		esp_ble_gap_set_device_name(blue_name.c_str()); // Bluetooth Name Change
-
-// 		pServer->startAdvertising(); // Preparing for New Connection
-
-// 		Serial.println("start advertising");
-// 		oldDeviceConnected = deviceConnected;
-// 	}
-
-// 	if (deviceConnected && !oldDeviceConnected)
-// 	{
-// 		oldDeviceConnected = deviceConnected;
-// 	}
-// }
+String rec_data_app(void)
+{
+	return rxValue.c_str();
+}
 
 //********************************************************************************************
 // Startus from App
@@ -147,6 +132,12 @@ bool device_connect_status()
 String Scan_JSON_On_BLE(void)
 {
 	return String(rxValue.c_str());
+}
+
+void set_ble_name(String _Name)
+{
+	std::remove(_Name.begin(), _Name.end(), ' ');
+	esp_ble_gap_set_device_name(_Name.c_str());
 }
 //********************************************************************************************
 // End of File

@@ -10,6 +10,7 @@
 #include "M_EEPROM.h"
 #include "Theft.h"
 #include "MDelay.h"
+#include "FOTA.h"
 
 //********************************************************************************************
 // Task Handles
@@ -25,9 +26,7 @@ xTaskHandle LED_HANDLE;
 
 DELAY MDelay;
 
-uint8_t RELAY_PIN = 19;
-uint8_t Charger_State = 0;
-long Time_counter = 0;
+uint8_t RELAY_PIN = 2;
 
 //********************************************************************************************
 // JSON Thread
@@ -76,11 +75,10 @@ void Main_Thread(void *pvParam)
 {
   while (1)
   {
-    digitalWrite(RELAY_PIN, LOW);
-    Charger_State = 0;
+    // Charger_State = 0;
     Serial.println("Checking for Charger Conditions!");
     while (Theft_Condion())
-      ;
+      Charger_State = 0;
     Charger_State = 1;
     Serial.println("Charger Conditions Are Perfect!");
     Serial.println("Waiting for mobile device to connect!");
@@ -88,6 +86,7 @@ void Main_Thread(void *pvParam)
       ;
     Charger_State = 2;
     Serial.println("Mobile device has been paired!");
+    set_ble_name(String(Get_Charger_Name() + "_O"));
     vTaskResume(JSON_FRAME_READ_HANDLE);
     MDelay.setDelay(BLE_CONN_WAIT_DELAY);
     while (!Start_message_identification())
@@ -102,6 +101,8 @@ void Main_Thread(void *pvParam)
     Charger_State = 3;
     Serial.println("Charging experience started!");
     digitalWrite(RELAY_PIN, HIGH);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    digitalWrite(RELAY_PIN, HIGH);
     vTaskResume(READ_METER_VALUE_HANDLE);
     while (Start_message_identification() && !Over_Load_Status() && !Battery_Full_Status() && !Session_Timeout_Status())
       ;
@@ -109,8 +110,8 @@ void Main_Thread(void *pvParam)
     Serial.println("Ending charging experience!");
     digitalWrite(RELAY_PIN, LOW);
     vTaskDelete(READ_METER_VALUE_HANDLE);
-    vTaskDelay(5 * 1000 / portTICK_PERIOD_MS);
     Record_EEPROM();
+    vTaskDelay(5 * 1000 / portTICK_PERIOD_MS);
     vTaskDelete(JSON_FRAME_READ_HANDLE);
     vTaskDelete(LED_HANDLE);
     ESP.restart();
@@ -126,6 +127,8 @@ void All_Init(void)
   disableCore1WDT();
   disableCore0WDT();
   Serial.begin(115200);
+  Serial.println();
+
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
   EEPROM_Init();
@@ -135,6 +138,15 @@ void All_Init(void)
   AES_Init();
   ble_init();
   Theft_Init(Theft_Detection_Pin);
+  init_WiFi();
+  Serial.printf("\nESP32 Chip model: %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());
+  String cid = String(uint32_t(ESP.getEfuseMac() >> 32), HEX) + String(uint32_t(ESP.getEfuseMac()), HEX);
+  cid.toUpperCase();
+  Serial.printf("MAC ID: %s\n", cid.c_str());
+  Serial.printf("Chip ID: %s\n", Get_Chip_ID().c_str());
+  Serial.printf("CPO ID: %s\n", Get_Charger_Name().c_str());
+  Serial.printf("Firmware Version: %s\n\n", Charger_Version);
+  Serial.println("Welcome to Magenta!");
 }
 
 //********************************************************************************************
@@ -144,13 +156,10 @@ void All_Init(void)
 void setup()
 {
   All_Init();
-  Serial.println();
-  Serial.println("Welcome to Magenta!");
-  Serial.printf("Connect to Bluetooth: %s \n", ("CG_POINT_" + Read_EEPROM_String(EEPROM_CHARGER_ID_ADD)).c_str());
-  xTaskCreatePinnedToCore(&Main_Thread, "Main_Thread", 4096, NULL, 2, NULL, 0);
-  xTaskCreatePinnedToCore(&LED_Thread, "LED_Thread", 1024, NULL, 2, &LED_HANDLE, 0);
-  xTaskCreatePinnedToCore(&JSON_Frame_Thread, "JSON_Frame_Thread", 4096, NULL, 2, &JSON_FRAME_READ_HANDLE, 1);
-  xTaskCreatePinnedToCore(&Read_Meter_Values_Thread, "READ_Meter_Values", 4096, NULL, 2, &READ_METER_VALUE_HANDLE, 1);
+  xTaskCreateUniversal(&Main_Thread, "Main_Thread", 4096, NULL, 1, NULL, 0);
+  xTaskCreateUniversal(&LED_Thread, "LED_Thread", 4096, NULL, 1, &LED_HANDLE, 0);
+  xTaskCreateUniversal(&JSON_Frame_Thread, "JSON_Frame_Thread", 4096, NULL, 1, &JSON_FRAME_READ_HANDLE, 1);
+  xTaskCreateUniversal(&Read_Meter_Values_Thread, "READ_Meter_Values", 4096, NULL, 1, &READ_METER_VALUE_HANDLE, 1);
   vTaskSuspend(READ_METER_VALUE_HANDLE);
   vTaskSuspend(JSON_FRAME_READ_HANDLE);
 }
@@ -161,12 +170,13 @@ void setup()
 
 void loop()
 {
+  Check_WiFi();
   if (!digitalRead(EEPROM_Reset_Pin))
   {
     Write_EEPROM_Byte(EEPROM_CHARGER_DATA_FLAG_ADD, 0);
-    Write_EEPROM_String(EEPROM_CHARGER_ID_ADD, "P00000");
+    Write_EEPROM_String(EEPROM_CHARGER_ID_ADD, "           ");
     Serial.println("EEPROM Errased!");
-    Serial.printf("Charger ID: %s\n", Read_EEPROM_String(EEPROM_CHARGER_ID_ADD).c_str());
+    // Serial.printf("CPO ID: %s\n", Read_EEPROM_String(EEPROM_CHARGER_ID_ADD).c_str());
     Serial.printf("Total KWh Usage: %0.6f\n", Read_EEPROM_Float(EEPROM_Total_KWh_ADD));
     Serial.println("Rebooting!");
     ESP.restart();

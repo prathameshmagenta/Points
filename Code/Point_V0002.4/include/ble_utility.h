@@ -14,8 +14,10 @@ extern uint8_t adv_raw_data[];
 void ble_init(void);
 void data_communication(void);
 void send_data_app(uint8_t *dev_to_app_frame, uint16_t length);
+String rec_data_app(void);
 bool device_connect_status();
 String Scan_JSON_On_BLE(void);
+void set_ble_name(String _Name);
 
 //********************************************************************************************
 // End of File

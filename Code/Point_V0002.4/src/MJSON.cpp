@@ -17,7 +17,7 @@
 
 AESLib aesLib;
 StaticJsonDocument<1024> doc;
-StaticJsonDocument<1024> doc1;
+StaticJsonDocument<2048> doc1;
 
 //********************************************************************************************
 // Internal Calling Functions Declaration
@@ -38,7 +38,7 @@ String USER_ID;
 String Transaction_ID;
 String Rate_Update;
 uint8_t Start_Command = 0;
-uint16_t Table_pointer = 0;
+float Table_pointer = 0;
 bool Set_KWh_Value_Flag = false;
 bool Start_Charge = false;
 float KWh_from_App = 0.0;
@@ -65,12 +65,12 @@ byte aes_iv[N_BLOCK] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x
 void RX_Json_Packet_Field_Identifier(void)
 {
     Read_JSON_Frame();
-    USER_ID = (const char *)doc["user_id"];
-    Transaction_ID = (const char *)doc["trans_id"];
-    Transaction_Ammount = doc["ammount"];
-    Transaction_Rate = doc["rate"];
-    Rate_Update = (const char *)doc["rate_update"];
-    Start_Command = doc["start"];
+    USER_ID = (const char *)doc["user"];
+    Transaction_ID = (const char *)doc["tran"];
+    Transaction_Ammount = doc["ammt"];
+    Transaction_Rate = doc["rt"];
+    Rate_Update = (const char *)doc["rtup"];
+    Start_Command = doc["stsp"];
 
     if (Rate_Update == "Yes")
         Write_EEPROM_Float(EEPROM_ENERGY_RATE_ADD, Transaction_Rate);
@@ -122,37 +122,54 @@ void deser_JSON(char _json[])
 
 void ser_JSON(void)
 {
-    doc1["company"] = "Magenta";
+    doc1["comp"] = "Magenta";
     doc1["type"] = "Point";
-    doc1["charger_id"] = (String("CG_POINT_" + Read_EEPROM_String(EEPROM_CHARGER_ID_ADD))).c_str();
-    doc1["user_id"] = USER_ID;
-    doc1["trans_id"] = Transaction_ID;
-    doc1["ammount"] = Transaction_Ammount;
-    doc1["rate"] = Transaction_Rate;
-    doc1["rate_update"] = Rate_Update;
+    doc1["chrg"] = Get_Charger_Name();
+    doc1["user"] = USER_ID;
+    doc1["tran"] = Transaction_ID;
+    doc1["ammt"] = Transaction_Ammount;
+    doc1["rt"] = Transaction_Rate;
+    doc1["rtup"] = Rate_Update;
+    if (!Start_message_identification())
+        doc1["stat"] = uint8_t(1);
+    else if (Start_message_identification())
+        doc1["stat"] = uint8_t(2);
+    if (Battery_Full_Status() || Session_Timeout_Status())
+        doc1["stat"] = uint8_t(3);
     if (Start_message_identification() && !Over_Load_Status() && !Battery_Full_Status() && !Session_Timeout_Status())
-        doc1["start"] = 1;
+        doc1["stsp"] = uint8_t(1);
     else
-        doc1["start"] = 0;
-    doc1["meter_data"][0] = Voltage;
-    doc1["meter_data"][1] = Current;
-    doc1["meter_data"][2] = KWh;
-    doc1["session_sec"] = Session_Count;
-    if (Over_Load_Status())
-        doc1["overload"] = "ON";
-    else
-        doc1["overload"] = "OFF";
-    doc1["total_KWh"] = Read_EEPROM_Float(EEPROM_Total_KWh_ADD);
+        doc1["stsp"] = uint8_t(0);
+    doc1["mtr"][0] = String(Voltage, 2);
+    doc1["mtr"][1] = String(Current, ((Current >= 10.0) ? (3) : (4)));
+    doc1["mtr"][2] = String(KWh, 4);
+    if (Start_message_identification() && !Over_Load_Status() && !Battery_Full_Status() && !Session_Timeout_Status())
+        Session_Count++;
+    doc1["sess"] = Session_Count;
+    if (!Over_Load_Status())
+        doc1["err"] = uint8_t(0);
+    else if (Over_Load_Status() && Voltage > U_Voltage)
+        doc1["err"] = uint8_t(10);
+    else if (Over_Load_Status() && Voltage > L_Voltage)
+        doc1["err"] = uint8_t(11);
+    else if (Over_Load_Status() && Current > U_Current)
+        doc1["err"] = uint8_t(12);
+    else if (Over_Load_Status() && Voltage == 0.0f)
+        doc1["err"] = uint8_t(15);
+    else if (Over_Load_Status() && Temp > U_Temp)
+        doc1["err"] = uint8_t(18);
+
+    doc1["tKWh"] = Read_EEPROM_Float(EEPROM_Total_KWh_ADD);
     for (uint16_t i = EEPROM_USER_ID_TABLE_ADD_VALUE; i < MAX_TABLE_SIZE; i += EEPROM_USER_FIELD_ADD_OFFSET)
     {
-        doc1["record"][(4 * (i - EEPROM_USER_ID_TABLE_ADD_VALUE) / EEPROM_USER_FIELD_ADD_OFFSET)] =
+        doc1["rec"][(4 * (i - EEPROM_USER_ID_TABLE_ADD_VALUE) / EEPROM_USER_FIELD_ADD_OFFSET)] =
             Read_EEPROM_String(i);
-        doc1["record"][(4 * (i - EEPROM_USER_ID_TABLE_ADD_VALUE) / EEPROM_USER_FIELD_ADD_OFFSET) + 1] =
-            Read_EEPROM_Float(i + OFFSET);
-        doc1["record"][(4 * (i - EEPROM_USER_ID_TABLE_ADD_VALUE) / EEPROM_USER_FIELD_ADD_OFFSET) + 2] =
-            Read_EEPROM_Float(i + OFFSET + OFFSET);
-        doc1["record"][(4 * (i - EEPROM_USER_ID_TABLE_ADD_VALUE) / EEPROM_USER_FIELD_ADD_OFFSET) + 3] =
+        doc1["rec"][(4 * (i - EEPROM_USER_ID_TABLE_ADD_VALUE) / EEPROM_USER_FIELD_ADD_OFFSET) + 1] =
             Read_EEPROM_String(i + OFFSET + OFFSET + OFFSET);
+        doc1["rec"][(4 * (i - EEPROM_USER_ID_TABLE_ADD_VALUE) / EEPROM_USER_FIELD_ADD_OFFSET) + 2] =
+            Read_EEPROM_Float(i + OFFSET);
+        doc1["rec"][(4 * (i - EEPROM_USER_ID_TABLE_ADD_VALUE) / EEPROM_USER_FIELD_ADD_OFFSET) + 3] =
+            Read_EEPROM_Float(i + OFFSET + OFFSET);
     }
     serializeJson(doc1, Tx_JSON_Packet);
     // Crypto = encrypt(strdup(Tx_JSON_Packet.c_str()), Tx_JSON_Packet.length(), aes_iv);
@@ -166,11 +183,9 @@ void ser_JSON(void)
 
 void Send_JSON_Frame(void)
 {
-    if (Start_message_identification() && !Over_Load_Status() && !Battery_Full_Status() && !Session_Timeout_Status())
-        Session_Count++;
     ser_JSON();
     send_data_app((uint8_t *)Tx_JSON_Packet.c_str(), (uint16_t)Tx_JSON_Packet.length());
-    Serial.println("JSON Packet: " + Tx_JSON_Packet);
+    Serial.println("Tx JSON Packet: " + Tx_JSON_Packet);
     Tx_JSON_Packet.clear();
 }
 
@@ -233,21 +248,24 @@ void AES_Init(void)
 
 void Record_EEPROM(void)
 {
-    Table_pointer = Read_EEPROM_Byte(EEPROM_USER_TABLE_POINTER_ADD);
-    if (Table_pointer < EEPROM_USER_ID_TABLE_ADD_VALUE || Table_pointer >= MAX_TABLE_SIZE)
+    Table_pointer = Read_EEPROM_Float(EEPROM_USER_TABLE_POINTER_ADD);
+    if (Table_pointer < EEPROM_USER_ID_TABLE_ADD_VALUE || Table_pointer >= MAX_TABLE_SIZE || isnan(Table_pointer))
     {
         Table_pointer = EEPROM_USER_ID_TABLE_ADD_VALUE;
-        Write_EEPROM_Byte(EEPROM_USER_TABLE_POINTER_ADD, EEPROM_USER_ID_TABLE_ADD_VALUE);
+        Write_EEPROM_Float(EEPROM_USER_TABLE_POINTER_ADD, EEPROM_USER_ID_TABLE_ADD_VALUE);
     }
-    Write_EEPROM_Float(EEPROM_Total_KWh_ADD, KWh + Read_EEPROM_Float(EEPROM_Total_KWh_ADD));
+    if (!isinf(KWh))
+        Write_EEPROM_Float(EEPROM_Total_KWh_ADD, KWh + Read_EEPROM_Float(EEPROM_Total_KWh_ADD));
+    else
+        Write_EEPROM_Float(EEPROM_Total_KWh_ADD, 0.0);
     Write_EEPROM_String(Table_pointer, USER_ID);
     Write_EEPROM_Float(Table_pointer + OFFSET, KWh);
     Write_EEPROM_Float(Table_pointer + OFFSET + OFFSET, Session_Count);
     Write_EEPROM_String(Table_pointer + OFFSET + OFFSET + OFFSET, Transaction_ID);
-    Write_EEPROM_Byte(EEPROM_USER_TABLE_POINTER_ADD, Table_pointer + EEPROM_USER_FIELD_ADD_OFFSET);
+    Write_EEPROM_Float(EEPROM_USER_TABLE_POINTER_ADD, Table_pointer + EEPROM_USER_FIELD_ADD_OFFSET);
     Serial.println();
     Serial.printf("Total KWh Usage: %0.6f\n", Read_EEPROM_Float(EEPROM_Total_KWh_ADD));
-    Serial.printf("Table Pointer: %d\n", Read_EEPROM_Byte(EEPROM_USER_TABLE_POINTER_ADD));
+    Serial.printf("Table Pointer: %0.1f\n", Read_EEPROM_Float(EEPROM_USER_TABLE_POINTER_ADD));
     for (uint16_t i = EEPROM_USER_ID_TABLE_ADD_VALUE; i < MAX_TABLE_SIZE; i += EEPROM_USER_FIELD_ADD_OFFSET)
         Serial.printf("User %d: %s\t KWh: %0.6f\t Session Sec: %0.2f\t Transaction ID: %s\n",
                       (i / EEPROM_USER_FIELD_ADD_OFFSET) - 1,
