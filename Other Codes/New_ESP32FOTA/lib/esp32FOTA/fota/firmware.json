@@ -1,0 +1,7 @@
+{
+    "type": "esp32-fota-http",
+    "version": 0.1,
+    "host": "52.188.122.113",
+    "port": 22,
+    "bin": "/fota/CG_POINT/Stage/Point_2.4.0.bin"
+}
