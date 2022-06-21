@@ -1,0 +1,65 @@
+#ifndef _DEFINE_H
+#define _DEFINE_H
+
+#include "Arduino.h"
+
+//********************************************************************************************
+// Charger Credential
+//********************************************************************************************
+
+#define Charger_Name "P0000"
+
+//********************************************************************************************
+// WiFi Credential
+//********************************************************************************************
+
+// #define SSID "POINT-"
+// #define PASSWORD "MMH01019"
+
+//********************************************************************************************
+// JSON Credential
+//********************************************************************************************
+
+#define JSON_Packet_Time_Interval_Sec 1
+
+//********************************************************************************************
+// EEPROM Credential
+//********************************************************************************************
+
+#define EEPROM_SIZE 32
+#define ID_LENGTH 5 + 1
+#define EEPROM_CHARGER_DATA_FLAG_ADD 0
+#define EEPROM_KWh_ADD 1
+#define EEPROM_Total_KWh_ADD 5
+#define EEPROM_CHARGER_ID_ADD 10
+#define EEPROM_USER_ID_ADD 20
+#define EEPROM_Reset_Pin 12
+
+//********************************************************************************************
+// Metering Credential
+//********************************************************************************************
+
+#define TEMP_SENSOR_PIN 0
+#define Metering_Time_Interval_mSec 100
+#define Average_Sample_Time 15
+#define Number_Of_Samples_Per_Sec (1000 / Metering_Time_Interval_mSec)
+#define Total_Number_Of_Samples (Average_Sample_Time * Number_Of_Samples_Per_Sec)
+#define Time_Multiplier 60
+#define U_Voltage 280.0
+#define L_Voltage 180.0
+#define U_Current 13.0
+#define L_Current 0.1
+#define U_Temp 50
+#define L_Temp 10
+
+//********************************************************************************************
+// Theft Credential
+//********************************************************************************************
+
+#define Theft_Detection_Pin 35
+
+//********************************************************************************************
+// End
+//********************************************************************************************
+
+#endif

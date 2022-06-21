@@ -22,28 +22,28 @@ float Old_Irms = 0.0;
 float Old_Vrms = 0.0;
 float Old_P = 0.0;
 
-void init_WiFi(void)
-{
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  Serial.print("Connecting to network");
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println();
-  Serial.print("Connected to ");
-  Serial.println(ssid);
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-            { request->send(200, "text/plain", "ESP-32 OTA Page!"); });
+// void init_WiFi(void)
+// {
+//   WiFi.mode(WIFI_STA);
+//   WiFi.begin(ssid, password);
+//   Serial.print("Connecting to network");
+//   while (WiFi.status() != WL_CONNECTED)
+//   {
+//     delay(500);
+//     Serial.print(".");
+//   }
+//   Serial.println();
+//   Serial.print("Connected to ");
+//   Serial.println(ssid);
+//   Serial.print("IP address: ");
+//   Serial.println(WiFi.localIP());
+//   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+//             { request->send(200, "text/plain", "ESP-32 OTA Page!"); });
 
-  AsyncElegantOTA.begin(&server); // Start AsyncElegantOTA
-  server.begin();
-  Serial.println("HTTP server started!");
-}
+//   AsyncElegantOTA.begin(&server); // Start AsyncElegantOTA
+//   server.begin();
+//   Serial.println("HTTP server started!");
+// }
 
 void setup()
 {
@@ -55,8 +55,8 @@ void setup()
   ledcAttachPin(13, 0);
   pinMode(A0, INPUT);
   pinMode(A3, INPUT);
-  EMON.current(A0, 19.75);
-  EMON.voltage(A3, 4885.5, 0);
+  EMON.current(A0, 19.75 / 3);
+  EMON.voltage(A3, 4550.0 * 2, 0);
   Serial.println("ESP-32 Details:");
   MAC = ESP.getEfuseMac();
   for (uint8_t i = 0; i < 17; i = i + 8)
@@ -72,20 +72,20 @@ void setup()
   ledcWrite(0, 128);
   float PWM_Freq = ledcReadFreq(0);
   Serial.printf("PWM Channel Frequency: %0.2f\n\n", PWM_Freq);
-  init_WiFi();
+  // init_WiFi();
 }
 
 void loop()
 {
   // put your main code here, to run repeatedly:
-  EMON.calcVI(20000, 500);
+  EMON.calcVI(30000, 500);
   float Irms = EMON.Irms;
   float Vrms = EMON.Vrms;
   Irms = (Irms < 0.15) ? (0.0) : (Irms);
-  // float P = Vrms * Irms;
+  float P = Vrms * Irms;
   // if (P != Old_P)
   // {
-    Serial.printf("Voltage: %0.2f V\tCurrent: %0.4f A\t Power: %0.2f W\n", Vrms, Irms, (Irms * Vrms));
+  Serial.printf("Voltage: %0.2f V\tCurrent: %0.4f A\t Power: %0.2f W\n", Vrms, Irms, P);
   //   Old_P = P;
   // }
   // delay(1000);
